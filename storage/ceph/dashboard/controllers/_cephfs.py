@@ -17,8 +17,6 @@
 import os
 import rados
 import cephfs
-import getopt
-import sys
 import json
 
 """
@@ -26,13 +24,19 @@ CEPH_CLUSTER_NAME=test CEPH_MON=172.24.0.4 CEPH_AUTH_ID=admin CEPH_AUTH_KEY=AQCM
 """
 try:
     import ceph_volume_client
+
     ceph_module_found = True
 except ImportError as e:
     ceph_volume_client = None
     ceph_module_found = False
 
-VOlUME_GROUP="kubernetes"
-CONF_PATH="/etc/ceph/"
+VOlUME_GROUP = "kubernetes"
+CONF_PATH = "/etc/ceph/"
+
+"""
+self.volume_prefix = os.environ.get('CEPH_VOLUME_ROOT', None)
+self.volume_group = os.environ.get('CEPH_VOLUME_GROUP', VOlUME_GROUP)
+"""
 
 class CephFSNativeDriver(object):
     """Driver for the Ceph Filesystem.
@@ -48,7 +52,6 @@ class CephFSNativeDriver(object):
         except KeyError:
             self.ceph_namespace_isolation_disabled = False
         self._volume_client = None
-        # Default volume_prefix to None; the CephFSVolumeClient constructor uses a ternary operator on the input argument to default it to /volumes
         self.volume_prefix = os.environ.get('CEPH_VOLUME_ROOT', None)
         self.volume_group = os.environ.get('CEPH_VOLUME_GROUP', VOlUME_GROUP)
 
@@ -72,7 +75,7 @@ class CephFSNativeDriver(object):
         if not os.path.isfile(keyring_path) or os.access(keyring_path, os.W_OK):
             keyring = open(keyring_path, 'w')
             keyring.write("[client." + id + "]\n")
-            keyring.write("key = " + key  + "\n")
+            keyring.write("key = " + key + "\n")
             keyring.write("caps mds = \"allow *\"\n")
             keyring.write("caps mon = \"allow *\"\n")
             keyring.write("caps osd = \"allow *\"\n")
@@ -107,7 +110,7 @@ class CephFSNativeDriver(object):
         self._create_keyring(cluster_name, auth_id, auth_key)
 
         self._volume_client = ceph_volume_client.CephFSVolumeClient(
-            auth_id, conf_path, cluster_name, volume_prefix = self.volume_prefix)
+            auth_id, conf_path, cluster_name, volume_prefix=self.volume_prefix)
         try:
             self._volume_client.connect(None)
         except Exception:
@@ -203,18 +206,6 @@ class CephFSNativeDriver(object):
                     'entity': client_entity
                 }
             )
-
-        # Result expected like this:
-        # [
-        #     {
-        #         "entity": "client.foobar",
-        #         "key": "AQBY0\/pViX\/wBBAAUpPs9swy7rey1qPhzmDVGQ==",
-        #         "caps": {
-        #             "mds": "allow *",
-        #             "mon": "allow *"
-        #         }
-        #     }
-        # ]
         assert len(caps) == 1
         assert caps[0]['entity'] == client_entity
         return caps[0]
@@ -225,7 +216,8 @@ class CephFSNativeDriver(object):
         volume_path = ceph_volume_client.VolumePath(self.volume_group, path)
 
         # Create the CephFS volume
-        volume = self.volume_client.create_volume(volume_path, size=size, namespace_isolated=not self.ceph_namespace_isolation_disabled)
+        volume = self.volume_client.create_volume(volume_path, size=size,
+                                                  namespace_isolated=not self.ceph_namespace_isolation_disabled)
 
         # To mount this you need to know the mon IPs and the path to the volume
         mon_addrs = self.volume_client.get_mon_addrs()
@@ -271,13 +263,12 @@ class CephFSNativeDriver(object):
                          for access_level in access_levels}
         if namespace:
             want_osd_caps = {'allow {0} pool={1} namespace={2}'.format(
-                             access_level, pool_name, namespace)
-                             for access_level in access_levels}
+                access_level, pool_name, namespace)
+                for access_level in access_levels}
         else:
             want_osd_caps = {'allow {0} pool={1}'.format(
-                             access_level, pool_name)
-                             for access_level in access_levels}
-
+                access_level, pool_name)
+                for access_level in access_levels}
 
         try:
             existing = self.volume_client._rados_command(
@@ -324,41 +315,3 @@ class CephFSNativeDriver(object):
         if self._volume_client:
             self._volume_client.disconnect()
             self._volume_client = None
-
-def usage():
-    print("Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id -s size")
-
-def main():
-    create = True
-    share = ""
-    user = ""
-    size = None
-    cephfs = CephFSNativeDriver()
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "rn:u:s:", ["remove"])
-    except getopt.GetoptError:
-        usage()
-        sys.exit(1)
-
-    for opt, arg in opts:
-        if opt == '-n':
-            share = arg
-        elif opt == '-u':
-            user = arg
-        elif opt == '-s':
-            size = arg
-        elif opt in ("-r", "--remove"):
-            create = False
-
-    if share == "" or user == "":
-        usage()
-        sys.exit(1)
-
-    if create:
-        print(cephfs.create_share(share, user, size=size))
-    else:
-        cephfs.delete_share(share, user)
-
-
-if __name__ == "__main__":
-    main()

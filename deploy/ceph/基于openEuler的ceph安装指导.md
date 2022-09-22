@@ -110,6 +110,9 @@ ceph dashboard set-login-credentials admin abc@123
 3.部署osd
 ceph-deploy disk zap ceph-01 /dev/sdd
 ceph-deploy osd create ceph-01 --data /dev/sdb
+
+4.部署mds
+ceph-deploy mds create ceph-01 ceph-02 ceph-03
 ~~~
 
 ## 4.异常解决
