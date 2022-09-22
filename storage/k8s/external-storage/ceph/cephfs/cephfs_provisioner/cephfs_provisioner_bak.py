@@ -326,7 +326,7 @@ class CephFSNativeDriver(object):
             self._volume_client = None
 
 def usage():
-    print("Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id -s size")
+    print "Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id -s size"
 
 def main():
     create = True
@@ -353,14 +353,9 @@ def main():
     if share == "" or user == "":
         usage()
         sys.exit(1)
-    # 1.args
-    """
-    -n share
-    -u opt
-    -s size
-    """
+
     if create:
-        print(cephfs.create_share(share, user, size=size))
+        print cephfs.create_share(share, user, size=size)
     else:
         cephfs.delete_share(share, user)
 
