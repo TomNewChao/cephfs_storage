@@ -120,7 +120,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
-	cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, err := p.parseParameters(options.Parameters)
+	username, password, url, cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, err := p.parseParameters(options.Parameters)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +149,9 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		"CEPH_MON=" + strings.Join(mon[:], ","),
 		"CEPH_AUTH_ID=" + adminID,
 		"CEPH_AUTH_KEY=" + adminSecret,
+		"URL=" + url,
+		"USERNAME=" + username,
+		"PASSWORD=" + password,
 		"CEPH_VOLUME_ROOT=" + pvcRoot}
 	if deterministicNames {
 		cmd.Env = append(cmd.Env, "CEPH_VOLUME_GROUP="+options.PVC.Namespace)
@@ -249,7 +252,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if err != nil {
 		return err
 	}
-	cluster, adminID, adminSecret, pvcRoot, mon, _, err := p.parseParameters(class.Parameters)
+	username, password, url, cluster, adminID, adminSecret, pvcRoot, mon, _, err := p.parseParameters(class.Parameters)
 	if err != nil {
 		return err
 	}
@@ -262,6 +265,9 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		"CEPH_MON=" + strings.Join(mon[:], ","),
 		"CEPH_AUTH_ID=" + adminID,
 		"CEPH_AUTH_KEY=" + adminSecret,
+		"URL=" + url,
+		"USERNAME=" + username,
+		"PASSWORD=" + password,
 		"CEPH_VOLUME_ROOT=" + pvcRoot}
 	if *disableCephNamespaceIsolation {
 		cmd.Env = append(cmd.Env, "CEPH_NAMESPACE_ISOLATION_DISABLED=true")
@@ -288,12 +294,12 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return nil
 }
 
-func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (string, string, string, string, []string, bool, error) {
+func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (string, string, string, string, string, string, string, []string, bool, error) {
 	var (
-		err                                                                           error
-		mon                                                                           []string
-		cluster, adminID, adminSecretName, adminSecretNamespace, adminSecret, pvcRoot string
-		deterministicNames                                                            bool
+		err                                                                                                    error
+		mon                                                                                                    []string
+		cluster, adminID, adminSecretName, adminSecretNamespace, adminSecret, pvcRoot, username, password, url string
+		deterministicNames                                                                                     bool
 	)
 
 	adminSecretNamespace = "default"
@@ -301,9 +307,18 @@ func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (strin
 	cluster = "ceph"
 	pvcRoot = "/volumes/kubernetes"
 	deterministicNames = false
+	username = ""
+	password = ""
+	url = ""
 
 	for k, v := range parameters {
 		switch strings.ToLower(k) {
+		case "username":
+			username = v
+		case "password":
+			password = v
+		case "url":
+			url = v
 		case "cluster":
 			cluster = v
 		case "monitors":
@@ -343,20 +358,20 @@ func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (strin
 			// On error, strconv.ParseBool() returns false; leave that, as it is a perfectly fine default
 			deterministicNames, _ = strconv.ParseBool(v)
 		default:
-			return "", "", "", "", nil, false, fmt.Errorf("invalid option %q", k)
+			return "", "", "", "", "", "", "", nil, false, fmt.Errorf("invalid option %q", k)
 		}
 	}
 	// sanity check
 	if adminSecretName == "" {
-		return "", "", "", "", nil, false, fmt.Errorf("missing Ceph admin secret name")
+		return "", "", "", "", "", "", "", nil, false, fmt.Errorf("missing Ceph admin secret name")
 	}
 	if adminSecret, err = p.parsePVSecret(adminSecretNamespace, adminSecretName); err != nil {
-		return "", "", "", "", nil, false, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
+		return "", "", "", "", "", "", "", nil, false, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
 	if len(mon) < 1 {
-		return "", "", "", "", nil, false, fmt.Errorf("missing Ceph monitors")
+		return "", "", "", "", "", "", "", nil, false, fmt.Errorf("missing Ceph monitors")
 	}
-	return cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, nil
+	return username, password, url, cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, nil
 }
 
 func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string, error) {
