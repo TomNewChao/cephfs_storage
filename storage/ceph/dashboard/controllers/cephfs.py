@@ -11,7 +11,8 @@ from ..security import Scope
 from ..services.ceph_service import CephService
 from ..services.cephfs import CephFS as CephFS_
 from ..tools import ViewCache
-from . import APIDoc, APIRouter, EndpointDoc, RESTController, UIRouter, allow_empty_body
+from . import APIDoc, APIRouter, EndpointDoc, RESTController, UIRouter, allow_empty_body, create_share, delete_share, \
+    CephBaseConfig
 
 GET_QUOTAS_SCHEMA = {
     'max_bytes': (int, ''),
@@ -542,3 +543,31 @@ class CephFsUi(CephFS):
         except (cephfs.PermissionError, cephfs.ObjectNotFound):  # pragma: no cover
             paths = []
         return paths
+
+
+#  Accept: application/vnd.ceph.api.v1.0+json
+@APIRouter('/cephfsapi', Scope.CEPHFS, secure=False)
+class CephFsApi(RESTController):
+    @RESTController.Collection('POST', path="/share")
+    @allow_empty_body
+    def share(self, share, user, size, username, password):
+        if not (CephBaseConfig.username == username and CephBaseConfig.password == password):
+            raise Exception("Forbidden")
+        print("share: receive param is {},{},{},{},{}".format(share, user, size, username, password))
+        return create_share(share, user, size)
+
+    @RESTController.Collection("POST", path="/handler_share")
+    @allow_empty_body
+    def handler_share(self, share, user, username, password):
+        if not (CephBaseConfig.username == username and CephBaseConfig.password == password):
+            raise Exception("Forbidden")
+        print("share: receive param is {},{},{},{}".format(share, user, username, password))
+        return delete_share(share, user)
+
+    @RESTController.Collection("GET", path="/handler")
+    @allow_empty_body
+    def handler_share(self):
+        data = {
+            "username": "ok"
+        }
+        return data

@@ -10,6 +10,7 @@ from ._rest_controller import RESTController
 from ._router import Router
 from ._task import Task
 from ._ui_router import UIRouter
+from ._cephfs import create_share, delete_share, CephBaseConfig
 
 __all__ = [
     'BaseController',

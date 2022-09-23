@@ -70,10 +70,9 @@ class CephFSNativeDriver(object):
             return self._volume_client
         if not ceph_module_found:
             raise ValueError("Ceph client libraries not found.")
-        from .. import mgr
         self._volume_client = ceph_volume_client.CephFSVolumeClient(CephBaseConfig.auth_id, CephBaseConfig.conf_path,
                                                                     CephBaseConfig.cluster_name,
-                                                                    volume_prefix=self.volume_prefix, rados=mgr.rados)
+                                                                    volume_prefix=self.volume_prefix)
         try:
             self._volume_client.connect(None)
         except Exception:
@@ -121,7 +120,7 @@ class CephFSNativeDriver(object):
                     'entity': client_entity,
                     'caps': [
                         'mds', want_mds_cap,
-                        'osd', 'allow r',
+                        'osd', want_osd_cap,
                         'mon', 'allow r']
                 })
         else:
@@ -150,15 +149,30 @@ class CephFSNativeDriver(object):
                 cap_tokens.add(want)
 
                 return ",".join(cap_tokens)
+            print(cap)
             osd_cap_str = cap_update(cap['caps'].get('osd', ""), want_osd_cap, unwanted_osd_cap)
             mds_cap_str = cap_update(cap['caps'].get('mds', ""), want_mds_cap, unwanted_mds_cap)
+            print("****************")
+            print(client_entity)
+            print(mds_cap_str)
+            print(osd_cap_str)
+            print(cap['caps'].get('mon'))
+            # caps = self._volume_client._rados_command(
+            #     'auth caps',
+            #     {
+            #         'entity': client_entity,
+            #         'caps': [
+            #             'mds', mds_cap_str,
+            #             'osd', osd_cap_str,
+            #             'mon', cap['caps'].get('mon')]
+            #     })
             caps = self._volume_client._rados_command(
                 'auth caps',
                 {
                     'entity': client_entity,
                     'caps': [
                         'mds', mds_cap_str,
-                        'osd', 'allow r',
+                        'osd', r'allow *',
                         'mon', cap['caps'].get('mon')]
                 })
             caps = self._volume_client._rados_command(
@@ -169,6 +183,8 @@ class CephFSNativeDriver(object):
             )
         assert len(caps) == 1
         assert caps[0]['entity'] == client_entity
+        print("*****************")
+        print(caps[0])
         return caps[0]
 
     def create_share(self, path, user_id, size=None):
@@ -276,11 +292,17 @@ class CephFSNativeDriver(object):
             self._volume_client = None
 
 
-def create_share(share, user, size):
-    return CephFSNativeDriver().create_share(share, user, size)
+# def create_share(share, user, size):
+# return CephFSNativeDriver().create_share(share, user, size)
+def create_share():
+    return CephFSNativeDriver().create_share("demo", "admin", "10000")
 
 
 # CEPH_CLUSTER_NAME=test CEPH_MON=172.24.0.4 CEPH_AUTH_ID=admin CEPH_AUTH_KEY=AQCMpH9YM4Q1BhAAXGNQyyOne8ZsXqWGon/dIQ== cephfs_provisioner.py -n foo -u bar
 
 def delete_share(share, user):
     return CephFSNativeDriver().delete_share(share, user)
+
+
+if __name__ == '__main__':
+    create_share()
