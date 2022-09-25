@@ -2,5 +2,7 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/storage/k8s/external-storage" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/storage/k8s/external-storage-bak" vcs="Git" />
   </component>
 </project>

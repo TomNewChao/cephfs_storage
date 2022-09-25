@@ -565,9 +565,8 @@ class CephFsApi(RESTController):
         return delete_share(share, user)
 
     @RESTController.Collection("GET", path="/handler")
-    @allow_empty_body
     def handler_share(self):
         data = {
-            "username": "ok"
+            "test": "ok"
         }
         return data
